@@ -36,11 +36,23 @@ Add packaging tests that build the main plugin wheel and source distribution, th
 - `napari.yaml`.
 - `worker/pyproject.toml`.
 - Every worker module and required worker resource.
-- Every direct host import in `Requires-Dist`, with no requirement outside napari's direct base requirements for the current platform.
+- Every third-party package imported directly by host code appears in `Requires-Dist`, and every active `Requires-Dist` entry is permitted by napari's host dependency contract.
 - No worker-only package in the main distribution's `Requires-Dist` metadata.
 - An empty static `dependencies` list in the embedded worker project.
 
-Run `npe2 validate` against the built or installed plugin so path containment, environment references, and worker command declarations are checked.
+Build the wheel and run `npe2 validate` against that artifact in an environment containing a supported napari version:
+
+```sh
+python -m build
+npe2 validate dist/napari_example-0.1.0-py3-none-any.whl
+```
+
+This checks path containment, environment references, worker command declarations, and the wheel's final `Requires-Dist` metadata.
+It rejects active requirements that napari does not directly require, constraints that exclude installed host versions, direct URLs, and dependency extras that napari does not already supply.
+Validate at least the oldest and newest supported napari versions across the supported Python and platform matrix, plus any known dependency-boundary versions.
+The managed installer must repeat the check against the user's exact environment.
+
+Validating a raw manifest checks its schema and any matching static `[project].dependencies` that `npe2` can find, but it cannot replace final wheel validation.
 
 At least one integration test should use napari's real environment backend when practical.
 Exercise provisioning, recipe reuse, a recipe change, array and nested-value transport, cancellation, a remote failure, and worker shutdown.

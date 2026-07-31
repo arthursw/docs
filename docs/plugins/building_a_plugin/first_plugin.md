@@ -312,6 +312,14 @@ python -m build
 This will create a `dist/` folder containing `.whl` and `.tar.gz` files,
 which you can upload to [PyPI](https://pypi.org/) or share with others.
 
+Validate the wheel in the napari development environment before publishing it:
+
+```sh
+npe2 validate dist/napari_hello-0.0.1-py3-none-any.whl
+```
+
+In addition to the manifest, this checks that each active wheel requirement names napari or one of napari's direct base requirements and accepts the installed version.
+
 However, you may wish to automate distribution of your plugin using Github,
 see below and the [Publishing](plugin-deploy) guide for more details.
 

@@ -420,12 +420,12 @@ Show a concise message in the widget or a napari notification, and preserve deta
 
 ## 8. Validate the migration
 
-### Validate the manifest
+### Validate the source metadata
 
 Install a version of `npe2` that supports managed environments, then validate the plugin:
 
 ```sh
-npe2 validate napari-segmenter
+npe2 validate src/napari_segmenter/napari.yaml
 ```
 
 Validation should reject:
@@ -436,6 +436,12 @@ Validation should reject:
 - `accepts_worker_context` on an in-process command;
 - unsafe embedded-package paths;
 - worker commands used directly as widgets, readers, writers, or sample data.
+- active requirements for packages other than napari or its direct base requirements in the validation environment;
+- host version constraints that exclude the installed version;
+- active direct URL requirements and dependency extras not already provided by napari.
+
+When `npe2` finds a matching `pyproject.toml`, it checks its static `[project].dependencies` as an early authoring check.
+Missing package metadata produces a warning; dynamic dependencies require validation of the built wheel.
 
 ### Inspect the built wheel
 
@@ -443,8 +449,13 @@ Build the distribution and inspect its contents:
 
 ```sh
 python -m build
+npe2 validate dist/napari_segmenter-1.0.0-py3-none-any.whl
 python -m zipfile -l dist/napari_segmenter-1.0.0-py3-none-any.whl
 ```
+
+The wheel check uses final `Requires-Dist` metadata and is required even when source validation passed.
+Validate at least the oldest and newest supported napari versions across the supported Python and platform matrix, plus any known dependency-boundary versions.
+The managed installer must repeat the check against the user's exact environment.
 
 Confirm that the wheel contains:
 

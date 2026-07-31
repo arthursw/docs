@@ -30,6 +30,7 @@ Pass layer data into a worker as a NumPy array and apply the returned value to t
 ## Follow the dependency rule
 
 Code in the napari process may rely only on Python's standard library, the plugin's own modules, napari, and packages in napari's direct base requirements for the current platform.
+Here, **direct base requirements** means the packages listed by napari's own runtime package metadata for that platform, without napari's optional extras; a transitive package or another package that happens to be installed does not qualify.
 If a function needs any other runtime package, that function and its import belong in worker code and the package belongs in the worker environment declaration.
 This is a placement rule, not a performance recommendation: it applies to every additional package, even one that is small, pure Python, or unlikely to conflict today.
 
@@ -42,11 +43,13 @@ For a napari-managed installation to enforce this contract, it must inspect the 
 It must reject an active requirement unless its package is napari itself or a direct base requirement of napari for the current platform and the installed version satisfies the plugin's constraint.
 It must then install that same inspected wheel without dependency resolution.
 Checking package names alone is insufficient: two plugins could both require NumPy while placing incompatible constraints on its version.
-Direct URL requirements and dependency extras also require policy beyond a name and version check and should be rejected by the initial enforcement.
+Active direct URL requirements and dependency extras not already supplied by napari must also be rejected.
+A managed installation must install only the main package and must not request one of its optional extras.
 
 With that validation, accepting a plugin does not add, upgrade, or downgrade packages in napari's environment.
 The error should identify the rejected requirement and direct the author to move it, and the code that imports it, to a managed environment.
 Installations performed directly with `pip`, Conda, or another external tool remain outside that guarantee because napari does not control their dependency resolution.
+After napari or its base environment is upgraded, the managed installer must revalidate installed plugins against the new exact versions and disable or report any plugin that no longer satisfies the contract.
 
 ## Create an embedded worker distribution
 
@@ -530,6 +533,20 @@ napari_example/worker/napari_example_worker.py
 
 Inspect the main wheel metadata and confirm that every `Requires-Dist` entry follows the dependency rule above.
 Inspect the inner `pyproject.toml` in the wheel and confirm that `dependencies` remains empty.
+Validate the built artifact in an environment containing one supported napari version:
+
+```sh
+npe2 validate dist/napari_example-0.1.0-py3-none-any.whl
+```
+
+`npe2 validate` reads the wheel's authoritative `Requires-Dist` metadata.
+It rejects active requirements for packages outside napari's direct base requirements, constraints that exclude the installed version, active direct URL requirements, and dependency extras that napari does not already provide.
+Validate at least the oldest and newest supported napari versions across the supported Python and platform matrix, plus any known dependency-boundary versions, because requirements and environment markers can differ between installations.
+The managed installer must repeat the check against the user's exact environment.
+
+Validating a source `napari.yaml` checks the manifest and also checks a matching static `[project].dependencies` table when it can find one.
+If package metadata is unavailable, the command reports that dependency validation was skipped; the wheel check is still required before release.
+
 Install the wheel into a clean napari environment and prepare its managed environment through the plugin manager.
 
 An editable source installation is useful during development, but a successful source-tree test does not prove that package data is present in a release wheel.

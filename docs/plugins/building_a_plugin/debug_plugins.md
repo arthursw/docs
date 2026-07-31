@@ -47,7 +47,7 @@ The following commands will report any issues napari detects with your plugin th
 
 - `napari --plugin-info -v` prints installed napari plugins, what they provide, and any issues related to these plugins.
 - `napari --info` prints key environment information related to napari, and the version of installed plugins.
-- `npe2 validate YOUR_PLUGIN_NAME` ensures that your plugin has a valid manifest file.
+- `npe2 validate YOUR_PLUGIN_NAME` checks the installed plugin's manifest and host dependency metadata against the current napari environment.
 
 ```{note}
 In general, `napari --info` is a good first step to debugging any environment issues and providing the output from this command is useful when raising bugs.
@@ -89,6 +89,17 @@ Validate the manifest before provisioning:
 ```sh
 npe2 validate src/napari_example/napari.yaml
 ```
+
+For a source manifest, `npe2` checks a matching static `[project].dependencies` table when available.
+It warns if no matching package metadata is found; if dependencies are dynamic, it requires validation of the built wheel.
+Build and validate the wheel before release so final metadata is authoritative:
+
+```sh
+python -m build
+npe2 validate dist/napari_example-0.1.0-py3-none-any.whl
+```
+
+An invalid host dependency report identifies the requirement that must be removed from the main package or moved with its importing code to a managed worker environment.
 
 Open the plugin manager's environment dialog to inspect each environment's persistent state and worker state.
 The dialog can prepare or rebuild an environment, cancel provisioning, stop active workers, and remove installed environments.
