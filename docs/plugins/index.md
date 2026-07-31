@@ -45,7 +45,7 @@ Check out our plugin developer guides to start creating your own napari plugins.
 :link: how-to-build-a-plugin
 :link-type: ref
 
-Build a lightweight host plugin and, when needed, add isolated worker environments for dependency-heavy functionality.
+Build a plugin whose napari and Qt integration runs in the main process, and isolate every additional runtime dependency in a managed worker environment.
 ```
 
 ```{grid-item-card} Best practices

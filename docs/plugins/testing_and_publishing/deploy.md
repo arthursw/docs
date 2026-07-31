@@ -27,7 +27,11 @@ in the builtin plugin installer dialog.
 
 ### Publishing a plugin with embedded worker code
 
-Publish one outer plugin distribution.
+The main plugin distribution is the package installed alongside napari.
+Its host code contains napari and Qt integration and may depend only on napari and packages in napari's direct base requirements for the current platform.
+Functions that need any other runtime package run from an embedded worker distribution in a managed environment.
+
+Publish one main plugin distribution.
 The embedded worker project is package data inside that wheel and source distribution; it is not a second package that users install or a second project that you must publish.
 
 Before upload, build both artifacts and inspect their contents:
@@ -42,7 +46,7 @@ Verify that `napari.yaml`, the worker's `pyproject.toml`, worker modules, lockfi
 Install the built wheel into a clean napari environment and prepare each `on_install` environment through the plugin manager.
 Invoke every `on_demand` worker at least once or prepare it manually.
 
-Only host requirements belong in the outer `[project].dependencies`.
+Declare each directly imported host requirement in the main `[project].dependencies`, and do not declare any requirement outside napari's direct base requirements for the current platform there.
 Worker requirements belong in `contributions.environments`, and the embedded worker project's dependency list remains empty.
 This allows napari's managed installer to provision the manifest recipe without changing the environment running napari.
 

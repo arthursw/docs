@@ -1,21 +1,19 @@
 (managed-worker-environments)=
 
-# Run dependency-heavy plugin code in managed environments
+# Isolate plugin dependencies in managed worker environments
 
-Napari plugins often need libraries that cannot safely coexist with napari or with the dependencies of another plugin.
-Managed plugin environments let napari install those dependencies separately and run only the dependency-heavy functions outside the napari process.
-
-Use a managed environment when a plugin needs a large, specialized, or tightly pinned dependency that is not part of a default napari installation.
-Keep ordinary in-process commands for code that uses napari, Qt, or only lightweight compatible dependencies.
+A napari plugin can provide a user interface in the napari process while running functions that need additional packages in separate processes.
+Managed plugin environments give each plugin its own dependency set without changing the environment that runs napari.
 
 ## The host and worker model
 
 A plugin that uses managed environments has two parts:
 
-- **Host code** runs in the napari process.
+- The **main plugin package** is the Python distribution installed alongside napari.
+  Its **host code** runs in the napari process.
   It owns widgets, reads viewer state, calls napari and Qt APIs, and updates the user interface.
 - **Worker code** runs in a separate process created from a napari-managed environment.
-  It imports the environment's specialized dependencies and performs computation on ordinary Python values and NumPy arrays.
+  It imports packages not supplied by napari and performs computation on ordinary Python values and NumPy arrays.
 
 The plugin manifest connects the two parts.
 It declares the environment recipe and associates a command identifier with a qualified Python target such as `napari_example_worker:segment`.
@@ -28,6 +26,27 @@ Plugin code that uses napari or Qt APIs must remain in the host process.
 Worker modules must not import napari GUI APIs or manipulate a viewer, layer, or widget.
 Pass layer data into a worker as a NumPy array and apply the returned value to the viewer in host code.
 ```
+
+## Follow the dependency rule
+
+Code in the napari process may rely only on Python's standard library, the plugin's own modules, napari, and packages in napari's direct base requirements for the current platform.
+If a function needs any other runtime package, that function and its import belong in worker code and the package belongs in the worker environment declaration.
+This is a placement rule, not a performance recommendation: it applies to every additional package, even one that is small, pure Python, or unlikely to conflict today.
+
+The main plugin package must still declare the allowed packages that its host code imports directly.
+For example, host code that imports napari, NumPy, and qtpy declares all three, even though installing napari also supplies NumPy and qtpy.
+This keeps standard Python package metadata accurate while limiting host requirements to packages that napari already needs.
+Each declared version requirement must accept the exact version already installed with napari.
+
+For a napari-managed installation to enforce this contract, it must inspect the selected wheel's runtime requirements before changing the environment.
+It must reject an active requirement unless its package is napari itself or a direct base requirement of napari for the current platform and the installed version satisfies the plugin's constraint.
+It must then install that same inspected wheel without dependency resolution.
+Checking package names alone is insufficient: two plugins could both require NumPy while placing incompatible constraints on its version.
+Direct URL requirements and dependency extras also require policy beyond a name and version check and should be rejected by the initial enforcement.
+
+With that validation, accepting a plugin does not add, upgrade, or downgrade packages in napari's environment.
+The error should identify the rejected requirement and direct the author to move it, and the code that imports it, to a managed environment.
+Installations performed directly with `pip`, Conda, or another external tool remain outside that guarantee because napari does not control their dependency resolution.
 
 ## Create an embedded worker distribution
 
@@ -56,10 +75,10 @@ Napari finds it through `local_packages` in the manifest, and the environment ba
 This layout uses a flat module because a small worker rarely needs another `src` directory.
 If the worker grows into several modules, replace `napari_example_worker.py` with a package and configure the inner build accordingly.
 
-### Include the worker in the outer plugin wheel
+### Include the worker in the main plugin wheel
 
-The outer `pyproject.toml` still describes the plugin that users install.
-Its relevant sections can look like this, with host dependencies limited to packages required by code that runs in napari:
+The `pyproject.toml` at the repository root describes the main plugin package that users install.
+Its relevant sections can look like this:
 
 ```toml
 [build-system]
@@ -71,6 +90,7 @@ name = "napari-example"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
+    "napari>=0.8.1",
     "numpy",
     "qtpy",
 ]
@@ -92,9 +112,13 @@ napari_example = [
 ]
 ```
 
-Do not add a segmentation framework or another worker-only library to this outer `dependencies` list.
-An ordinary plugin installation resolves this list in napari's environment, so every entry must be safe to install beside napari.
-Worker dependencies belong in `napari.yaml`.
+The example host code imports napari, NumPy, and qtpy, so it declares all three as direct dependencies.
+They are permitted host dependencies because they are also direct base requirements of napari.
+Do not add the example segmentation library, or any other package not supplied by napari, to this `dependencies` list.
+Declare every such package in an environment in `napari.yaml`.
+
+An external `pip install` resolves the main package's metadata normally, which keeps the distribution usable outside napari's installer.
+The napari-managed installation design requires validation of the selected wheel before installation, as described in the dependency rule above.
 
 The `package-data` entry is essential.
 It places the inner `pyproject.toml` and worker source in the built plugin wheel so that napari can prepare the environment from the installed plugin.
@@ -128,7 +152,7 @@ Each line has a narrow purpose:
 - `name = "napari-example-worker"` gives the embedded distribution its own package-manager name.
   It does not create a second napari plugin because it declares no `napari.manifest` entry point.
 - `version = "0.1.0"` supplies the version required to build the distribution.
-  Keeping it aligned with the outer plugin version is simple, but napari uses the outer plugin version and the declared environment recipe when deciding whether to rebuild.
+  Keeping it aligned with the main plugin version is simple, but napari uses the main plugin version and the declared environment recipe when deciding whether to rebuild.
 - `requires-python = ">=3.10"` documents which Python versions can import the worker source.
   It must be compatible with the environment's `python` constraint.
 - `dependencies = []` is intentionally empty.
@@ -253,7 +277,7 @@ The environment fields mean:
 - `local_packages` identifies embedded worker distributions relative to the manifest.
 - `lockfile` can identify an optional Pixi lockfile relative to the manifest when reproducible resolution requires one.
 
-Include a declared lockfile in the outer plugin's package data just like the worker files.
+Include a declared lockfile in the main plugin package's data just like the worker files.
 
 Dependencies may be split between `conda` and `pypi`, but do not declare the same distribution in both lists.
 Pin dependencies as tightly as the worker needs and no tighter.
@@ -416,12 +440,12 @@ A direct `pip install` installs the host package but does not itself trigger nap
 Executing a worker command still prepares a missing or stale environment before starting the worker.
 
 Prepared environments persist across napari sessions.
-Napari fingerprints the outer plugin version, normalized environment recipe, lockfile contents, backend version, and recipe ABI.
+Napari fingerprints the main plugin version, normalized environment recipe, lockfile contents, backend version, and recipe ABI.
 It reuses an environment when that identity is unchanged and marks it stale when the declaration changes.
 Preparing a stale environment creates the new generation and retires the previous generation after the replacement succeeds.
 
-Release a new outer plugin version whenever embedded worker code changes.
-An editable source change made without changing the outer version does not by itself mark a prepared environment stale, so rebuild that environment explicitly during development.
+Release a new main plugin version whenever embedded worker code changes.
+An editable source change made without changing the main plugin version does not by itself mark a prepared environment stale, so rebuild that environment explicitly during development.
 
 Failed, interrupted, or canceled provisioning is cleaned up.
 A later preparation performs a clean build instead of resuming a partial installation.
@@ -462,7 +486,7 @@ Test host and worker code separately before adding an end-to-end environment tes
 
 Host-side tests should verify that:
 
-- importing the plugin and constructing its widgets does not import worker-only dependencies;
+- importing the main plugin package and constructing its widgets does not import packages declared only in worker environments;
 - the widget submits the expected command identifier and supported argument values;
 - progress updates change the plugin's status and progress controls;
 - completion adds or updates the expected layer on the GUI thread;
@@ -489,7 +513,7 @@ An isolation test can declare incompatible versions of the same dependency in tw
 ## Inspect the built plugin
 
 Always test the artifact that users will install.
-Build the outer plugin wheel and inspect its contents:
+Build the main plugin wheel and inspect its contents:
 
 ```sh
 python -m build
@@ -504,7 +528,7 @@ napari_example/worker/pyproject.toml
 napari_example/worker/napari_example_worker.py
 ```
 
-Inspect the outer wheel metadata and confirm that worker-only libraries are absent from `Requires-Dist`.
+Inspect the main wheel metadata and confirm that every `Requires-Dist` entry follows the dependency rule above.
 Inspect the inner `pyproject.toml` in the wheel and confirm that `dependencies` remains empty.
 Install the wheel into a clean napari environment and prepare its managed environment through the plugin manager.
 

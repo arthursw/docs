@@ -9,20 +9,20 @@ They can add:
 - Custom [widgets] and user interface elements.
 - [Sample data][sample_data].
 - Color [themes][theme].
-- Dependency-heavy computation in a napari-managed environment.
+- Computation that needs packages not supplied by napari, using a napari-managed environment.
 
 ## Choose where your code runs
 
-Every plugin has host code that runs inside the napari process.
-The manifest, widgets, menus, readers, writers, sample-data providers, and any code that uses napari or Qt APIs are host code.
-Keep this part lightweight because its dependencies share napari's Python environment.
+Every plugin has a main package that napari installs into its own Python environment.
+Code from this package runs inside the napari process; the documentation calls it **host code**.
+The manifest, widgets, menus, readers, writers, sample-data providers, and all code that uses napari or Qt APIs belong there.
 
-A plugin whose functionality needs packages outside napari's default installation can also declare isolated worker environments.
-Napari installs those dependencies separately for each plugin and executes declared worker commands outside the napari process.
-Use ordinary supported Python values and NumPy arrays to communicate between the host widget and worker.
+Host code may rely only on Python's standard library, the plugin's own modules, napari, and packages in napari's direct base requirements for the current platform.
+Any functionality that needs another runtime package must run as a declared **worker command** in a plugin-specific managed environment, regardless of how small or common that package is.
+Napari installs those additional dependencies outside its own environment and exchanges ordinary supported Python values and NumPy arrays with the worker process.
 
-Use a host-only plugin when its runtime dependencies are lightweight and compatible with napari.
-Use a managed worker when a dependency is large, slow to import, has platform-specific binaries, or could constrain packages used by napari or other plugins.
+Keeping every additional requirement in worker environments prevents those packages from being installed alongside napari.
+It is the basis for allowing independently developed plugins to require incompatible versions of the same library without conflicting with one another.
 
 ```{important}
 Managed environments isolate Python dependencies; they are not security sandboxes.
@@ -41,7 +41,7 @@ Build a small host-only plugin and learn the manifest and contribution model.
 :link: managed-worker-environments
 :link-type: ref
 
-Split a dependency-heavy plugin into lightweight host integration and isolated worker commands.
+Keep napari integration in the main process and make every additional runtime dependency available through isolated worker commands.
 ```
 
 ```{grid-item-card} Plugin functionality
@@ -69,7 +69,7 @@ Test both sides of the process boundary and publish one complete plugin distribu
 :link: managed-environment-migration
 :link-type: ref
 
-Move heavy dependencies and computation out of an existing plugin without moving its GUI code.
+Move dependencies not supplied by napari out of an existing plugin without moving its GUI code.
 ```
 ````
 

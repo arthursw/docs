@@ -16,6 +16,9 @@ plugin. Aim for [100% test coverage](best-practices-test-coverage)!
 
 ## Test plugins with managed environments
 
+A plugin with managed environments has a main package whose host code runs in napari and an embedded worker distribution whose functions run in a separate, plugin-specific environment.
+Host code may use only napari and packages in napari's direct base requirements for the current platform; every other runtime dependency belongs in the environment declared for worker code.
+
 Test the host and worker sides independently before adding a smaller number of end-to-end tests.
 
 Your host test suite should verify that:
@@ -28,12 +31,13 @@ Your host test suite should verify that:
 Your worker test suite should import the embedded worker module without napari or Qt and call each target as an ordinary function.
 Provide a small fake `napari_context` when testing progress and cooperative cancellation.
 
-Add packaging tests that build the outer wheel and source distribution, then inspect them for:
+Add packaging tests that build the main plugin wheel and source distribution, then inspect them for:
 
 - `napari.yaml`.
 - `worker/pyproject.toml`.
 - Every worker module and required worker resource.
-- No worker-only package in the outer distribution's `Requires-Dist` metadata.
+- Every direct host import in `Requires-Dist`, with no requirement outside napari's direct base requirements for the current platform.
+- No worker-only package in the main distribution's `Requires-Dist` metadata.
 - An empty static `dependencies` list in the embedded worker project.
 
 Run `npe2 validate` against the built or installed plugin so path containment, environment references, and worker command declarations are checked.

@@ -80,7 +80,9 @@ detail on installing plugins.
 
 ## Managing isolated plugin environments
 
-An installed plugin can declare one or more environments for dependency-heavy worker commands.
+Plugin interface code runs inside napari, but a plugin may need packages that napari does not supply.
+To prevent those packages from changing napari or conflicting with another plugin, the plugin declares a separate managed environment and runs the corresponding functions in a worker process.
+An installed plugin can declare one or more such environments.
 Select **Environments** on that plugin's entry to see each environment's installation policy, persistent state, and worker state.
 
 Available actions include:

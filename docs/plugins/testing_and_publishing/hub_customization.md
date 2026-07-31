@@ -121,19 +121,21 @@ requires-python = ">=3.11"
 
 #### Dependencies
 
-List only dependencies needed by code that runs in the napari process.
-The hub displays this outer package metadata on the detail page.
+The plugin's main distribution is installed alongside napari, and its host code runs in the napari process.
+Declare every package imported directly by host code, but limit this list to napari and packages in napari's direct base requirements for the current platform.
+The hub displays this main package metadata on the detail page.
 
 ```toml
 [project]
 dependencies = [
+    "napari",
     "numpy>=1.21",
     "qtpy",
 ]
 ```
 
-If dependency-heavy functionality runs as a managed worker, declare packages such as segmentation or machine-learning frameworks in an environment contribution instead.
-The environment recipe is authoritative for worker provisioning, but the hub does not currently present it as outer package dependency metadata.
+Declare every other runtime package in a managed environment contribution and import it only from the corresponding worker code, regardless of the package's size or perceived compatibility.
+The environment recipe is authoritative for worker provisioning, but the hub does not currently present it as main package dependency metadata.
 See [Isolated worker environments](managed-worker-environments).
 
 ```{warning}

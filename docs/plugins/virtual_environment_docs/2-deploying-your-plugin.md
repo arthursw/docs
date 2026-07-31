@@ -2,6 +2,9 @@
 
 This guide explains some of the techniques you can use to deploy your plugin.
 
+The main plugin distribution follows napari's host dependency rule: its runtime requirements are limited to napari and napari's direct base requirements for the current platform.
+Every other runtime requirement belongs in a managed environment declaration and is not a main-package PyPI or Conda requirement.
+
 ## Overview of PyPI and conda
 
 PyPI and conda are two options for how you distribute your package and allow your users to more easily find and install it. Ideally, try to deploy to both. But for now, try to at least use PyPI. You can always also provide your users with manual installation instructions (e.g. if you want them to use `conda` or have specific dependencies).
@@ -14,7 +17,7 @@ PyPI and conda are two options for how you distribute your package and allow you
 
 You are *strongly* encouraged to ship both! If the `wheel` is not present, `pip` will try to build it from the `sdist` before installation, and that may fail depending on the package. To see if a given package ships a `wheel`, check here: https://pypi.org/project/napari/#files
 
-**Note:** This goes for dependencies too! Check all your dependencies for wheel availability.
+Check wheel or Conda availability for packages declared in managed worker environments as well as for the main package.
 
 **[build](https://pypa-build.readthedocs.io/en/latest/)** is the recommended package builder that bundles your source code into `sdist` or `wheel` distributions. Install `build` into your local environment and then run it at the root of your package to build your package, as shown below:
 
@@ -94,7 +97,8 @@ jobs:
 ## Deploying to conda-forge
 
 This is only a brief guide to deploying to `conda-forge`. More information can be found in the [conda-forge docs](https://conda-forge.org/docs/maintainer/adding_pkgs.html).
-To deploy a plugin to `conda-forge`, the plugin's build and run requirements **must** be available on `conda-forge` so the plugin and its dependencies may be installed.
+To deploy a plugin to `conda-forge`, the main plugin package's build requirements and permitted host runtime requirements **must** be available on `conda-forge`.
+Packages declared only in managed worker environments do not belong in the Conda recipe's run requirements.
 
 1. Fork https://github.com/conda-forge/staged-recipes
 1. Create a new branch

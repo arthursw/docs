@@ -10,7 +10,7 @@ Some plugin developers may find more **in-depth, technical information** helpful
 
 - specifications for napari's plugin ecosystem using the plugin engine `npe2`.
 - migration to `npe2` from the deprecated napari plugin engine v1.
-- migration from dependency-heavy host code to napari-managed worker environments.
+- migration of dependencies not supplied by napari to napari-managed worker environments.
 
 ## npe2: napari plugin engine v2
 
@@ -39,6 +39,6 @@ Have a plugin written for the first generation plugin system? This guide will he
 :link: managed-environment-migration
 :link-type: ref
 
-Split an existing npe2 plugin into lightweight host integration and isolated worker commands.
+Keep napari integration in the main process and move every additional runtime dependency into an isolated worker environment.
 ```
 ````

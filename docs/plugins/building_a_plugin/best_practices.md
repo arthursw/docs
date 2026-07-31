@@ -2,11 +2,11 @@
 
 # Best practices for plugin developers
 
-Plugin code can run in the napari process or in a declared managed worker environment.
-The placement of code and dependencies affects startup time, compatibility, installation, and cleanup.
-
-Keep manifest loading, GUI integration, and all napari or Qt API use in a lightweight host package.
-Put dependency-heavy computation in a worker command when its requirements are not provided by a default napari installation.
+The main plugin package is installed in napari's Python environment, and its host code runs in the napari process.
+Manifest loading, GUI integration, and all napari or Qt API use belong in that package.
+Host code may rely only on Python's standard library, the plugin's own modules, napari, and packages in napari's direct base requirements for the current platform.
+Declare each allowed package that host code imports directly, with a version requirement that accepts the version installed with napari.
+Every other runtime package and the code that imports it belong in a declared managed worker environment.
 See [Isolated worker environments](managed-worker-environments) for the complete packaging and execution model.
 
 (best-practices-no-qt-backend)=
@@ -69,7 +69,7 @@ then your plugin will fail to import. Instead use `from qtpy import QtCore`.
 `qtpy` is a [Qt compatibility layer](https://github.com/spyder-ide/qtpy)
 that will import from whatever backend is installed in the environment.
 
-## Try not to depend on packages that require C compilation if these packages do not offer wheels
+## Check distribution support for packages in worker environments
 
 ```{tip}
 This requires some awareness of how your dependencies are built and distributed...
@@ -89,9 +89,9 @@ something about `gcc`, then you've run into a package that doesn't distribute
 wheels, and you didn't have the software required to compile it).
 ```
 
-As a plugin developer, if you depend on a package that uses C extensions but
-doesn't distribute a pre-compiled wheel, then it's very likely that your users
-will run into difficulties installing your plugin:
+Packages declared in a managed environment must still be available for every platform the plugin supports.
+Prefer a Conda package or Python wheel when either is available.
+If a package with C extensions is available only as a source distribution, users may need compilers and system libraries that are not present on their computers:
 
 - *What is a "wheel"?*
 
@@ -119,24 +119,26 @@ will run into difficulties installing your plugin:
   argument](https://docs.python.org/3.11/distutils/setupscript.html#describing-extension-modules).
 
 ```{admonition} What about conda?
-**conda** also distributes & installs pre-compiled packages, though they aren't
-wheels.  We encourage you to make your plugins 
-[available on conda-forge](deploying-to-conda-forge), which
-is a great way to handle binary dependencies in a reliable way. The built-in 
-[napari plugin manager](https://napari.org/napari-plugin-manager) currently
-supports installing plugins from both PyPI and conda-forge, with the default matching
-the source of the napari installation.
+**conda** also distributes and installs pre-compiled packages, though they are not wheels.
+Declare a worker's Conda requirements in its manifest environment recipe.
+You can also make the main plugin distribution [available on conda-forge](deploying-to-conda-forge), provided its run requirements follow the host dependency rule.
 ```
 
 (best_practice_napari_type)=
 
-## Don't make `napari` a runtime dependency of a plugin
+## Declare each host dependency that code imports at runtime
 
-Napari discovers and calls plugin host code from an already running napari installation.
-Put napari in a development or testing dependency group instead of the outer project's runtime dependencies.
-This avoids asking a package installer to resolve or replace napari when it installs the plugin.
+If host code imports a public napari API at runtime, declare `napari` in the main plugin package's dependencies.
+This keeps the distribution metadata accurate, supports installation into a clean Python environment, and can express a minimum compatible napari version.
+Do not declare `napari[all]`, `napari[qt]`, or another napari extra as a normal runtime dependency.
 
-Host code can still import public napari APIs when napari invokes it.
+Apply the same packaging rule to every direct host import.
+For example, declare NumPy or qtpy when host code imports it, but only because both are direct base requirements of napari.
+Do not declare a package that napari does not require; move the code that imports it to a managed worker environment.
+
+Napari's managed installation flow must verify these requirements against the running installation before changing its environment and install an accepted wheel without dependency resolution.
+Direct `pip` and Conda installations use normal package-manager behavior and remain outside napari's isolation guarantee.
+
 If you only use `napari` for type annotations, we recommend that you use strings
 instead of importing the types. This is called a
 [Forward reference](https://peps.python.org/pep-0484/#forward-references).
@@ -369,9 +371,9 @@ You can find more information in the
 
 ## License issues when including code from 3rd parties
 
-Plugins will often depend on third-party packages beyond `napari` itself.
-Host dependencies are included in the outer project's `pyproject.toml`.
-Worker-only dependencies are declared in the plugin manifest's environment recipe.
+Plugins often use third-party packages beyond `napari` itself.
+If a runtime package is outside napari's direct base requirements for the current platform, declare it in a managed environment and import it only from worker code.
+Do not add it to the main plugin package's `pyproject.toml`.
 However, sometimes developers might include code from 3rd parties directly in their project.
 Sometimes it will be just a little snippet, maybe slightly modified to suit the project needs.
 Some other times, a whole project will be included entirely (vendoring).
@@ -387,7 +389,7 @@ If you are vendoring other projects, please add an acknowledgement in your READM
 The license details in your project metadata should also include this information!
 ```
 
-## Keep dependency-heavy code out of the host process
+## Keep every additional runtime dependency out of the host process
 
 Consider the following example plugin:
 
@@ -397,13 +399,13 @@ napari.manifest =
   plugin-name = mypackage:napari.yaml
 ```
 
-In this example, `my_heavy_dependency_like_tensorflow` is a host dependency and is imported as soon as the module loads.
+In this example, `my_dependency_not_supplied_by_napari` is imported by host code even though napari does not supply it.
 
 ```py
 # mypackage/napari_plugin.py
 import numpy as np
 from qtpy.QtWidgets import QWidget
-from my_heavy_dependency_like_tensorflow import something_amazing
+from my_dependency_not_supplied_by_napari import something_amazing
 
 class MyWidget(QWidget):
     def do_something_amazing(self):
@@ -414,8 +416,8 @@ class FastWidget(QWidget):
         return np.zeros((10, 10))
 ```
 
-This makes the host plugin slow to import and lets the heavy package constrain napari's environment.
-Moving the import inside the method delays the cost, but does not isolate the dependency:
+This package would have to be installed into napari's environment, where its requirements could conflict with napari or another plugin.
+Moving the import inside the method delays it, but does not isolate the dependency:
 
 ```py
 # mypackage/napari_plugin.py
@@ -426,13 +428,13 @@ class MyWidget(QWidget):
     def do_something_amazing(self):
         # import has been moved here, will happen only after the user
         # has opened and used this widget.
-        from my_heavy_dependency_like_tensorflow import something_amazing
+        from my_dependency_not_supplied_by_napari import something_amazing
 
         return something_amazing()
 ```
 
-Lazy imports remain useful for dependencies that intentionally belong in the host.
-When a package is not part of napari's default installation, prefer a managed worker:
+Lazy imports remain useful for reducing the startup cost of packages that napari already supplies.
+A package that napari does not supply must instead be imported by a managed worker:
 
 ```py
 from napari.plugins import execute_worker_command
@@ -449,7 +451,7 @@ class MyWidget(QWidget):
         return task
 ```
 
-The associated command target imports the heavy dependency inside the plugin's declared worker environment.
+The associated command target imports the additional dependency inside the plugin's declared worker environment.
 The worker module must not import napari or Qt.
 
 ```{note}
@@ -459,11 +461,11 @@ A host contribution can submit a separate worker command and use its returned da
 
 ## Keep worker dependencies in one authoritative recipe
 
-Declare packages needed only by worker code in the environment's `conda` and `pypi` lists in `napari.yaml`.
+Declare every runtime package not supplied by napari in the environment's `conda` and `pypi` lists in `napari.yaml`.
 The embedded worker project's `pyproject.toml` must have an empty `dependencies` list.
 This makes the manifest the single recipe napari can display, fingerprint, provision, reuse, and rebuild.
 
-Do not duplicate heavy requirements in the outer host dependencies or the embedded worker project.
+Do not duplicate these requirements in the main plugin package or the embedded worker project.
 Duplicating them can install packages into the wrong process or make the declared recipe differ from what the worker actually needs.
 
 Prefer one embedded worker distribution when several named environments execute different targets from the same worker code.

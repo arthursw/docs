@@ -79,7 +79,7 @@ NAPARI_EXIT_ON_ERROR=1
 A plugin with a managed environment has two separate debugging contexts:
 
 - Host code runs in napari and includes widgets, napari or Qt API use, task callbacks, and conversion between layers and supported values.
-- Worker code runs in a separate process and includes the qualified command target and dependency-heavy imports.
+- Worker code runs in a separate process and includes the qualified command target and every import not supplied by napari.
 
 An IDE breakpoint in the napari process does not automatically attach to a managed worker.
 Unit-test the worker function directly in a development environment containing its declared dependencies, then use a real managed-environment test to cover provisioning and transport.

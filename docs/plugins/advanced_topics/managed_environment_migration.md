@@ -2,26 +2,36 @@
 
 # Migrate a plugin to managed worker environments
 
-This guide explains how to migrate an existing dependency-heavy `npe2` plugin so its napari and Qt integration stays in the napari process while its dependency-heavy computation runs in a napari-managed environment.
+This guide explains how to migrate an existing `npe2` plugin when it requires packages outside napari's direct base requirements for the current platform.
 
 Managed environments solve dependency conflicts between napari and plugins, and between different plugins.
 They do not make untrusted code safe to run.
 
-## Decide whether to migrate
+## Understand the target structure
 
-Use a managed worker environment when a feature needs dependencies that are large, slow to import, platform-sensitive, or likely to conflict with napari or another plugin.
-Examples include machine-learning frameworks, segmentation frameworks, and packages that require a specific NumPy version.
+After migration, the plugin has two execution locations:
 
-Keep code in the napari process when it:
+- The **main plugin package** remains installed with napari.
+  Its host code creates widgets, uses napari and Qt APIs, reads layer data, starts work, and displays results.
+- **Worker code** runs in a separate process created from a plugin-specific managed environment.
+  It imports packages not supplied by napari and exchanges ordinary supported values and NumPy arrays with the host code.
+
+The main plugin package may rely only on Python's standard library, its own modules, napari, and packages in napari's direct base requirements for the current platform.
+Every other runtime package belongs in a declared managed environment, regardless of its size, import time, or perceived compatibility.
+The main package still declares every allowed dependency that host code imports directly, and each version requirement must accept the version installed with napari.
+
+## Decide what code moves
+
+Keep code in the main plugin package when it:
 
 - creates or updates widgets;
 - accesses a napari viewer, layer, event, notification, or command API;
 - uses Qt;
-- needs a fast in-process call and uses only dependencies that are suitable for the napari environment.
+- uses only packages supplied by napari.
 
 Move code to a managed worker environment when it:
 
-- imports dependency-heavy frameworks;
+- imports any runtime package not supplied by napari;
 - can accept ordinary supported Python values and NumPy arrays;
 - can return ordinary supported Python values and NumPy arrays;
 - does not need napari or Qt objects.
@@ -35,18 +45,18 @@ Classify every import and dependency before changing the package.
 
 | Dependency kind | Examples | Where it belongs after migration |
 | --- | --- | --- |
-| Host | `qtpy`, lightweight widget helpers, small libraries imported by GUI code | Outer plugin project's `[project].dependencies` |
-| Worker | TensorFlow, PyTorch, Cellpose, StarDist, model-specific libraries | The environment recipe in `napari.yaml` |
+| Host | `napari`, Python's standard library, and packages supplied by napari such as NumPy and qtpy | Main plugin package; declare each directly imported package in `[project].dependencies` |
+| Worker | Every runtime package not supplied by napari, including TensorFlow, PyTorch, Cellpose, StarDist, or a small helper library | The environment recipe in `napari.yaml` |
 | Development | `pytest`, `pytest-qt`, linters, documentation tools | Optional development or test dependency groups |
 
 NumPy may be used on both sides of the boundary.
 List it in the environment recipe when worker dependencies require a particular version.
-Keep it as a host dependency only if host code imports it directly and your packaging policy requires the plugin to declare it.
+Host code can use the NumPy version installed with napari, but any declared NumPy constraint must accept that exact version.
 
 Search for imports at module scope as well as imports inside functions.
-A host widget module must not import a worker-only dependency, even lazily during widget construction.
+A host widget module must not import a package declared only in a worker environment, even lazily during widget construction.
 
-For example, a plugin might begin with this outer project metadata:
+For example, a plugin might begin with this main package metadata:
 
 ```toml
 [project]
@@ -61,19 +71,21 @@ dependencies = [
 ]
 ```
 
-After migration, the outer project contains only dependencies imported by its host code:
+After migration, the main package declares only the dependencies imported by host code and already required by napari:
 
 ```toml
 [project]
 name = "napari-segmenter"
 dependencies = [
-    "qtpy",
+    "napari>=0.8.1",
     "numpy",
+    "qtpy",
 ]
 ```
 
-Do not retain worker dependencies in the outer project "just in case."
-An installer processes outer project dependencies in the napari environment before napari can apply the managed-environment contract.
+Do not retain a package not supplied by napari in the main package "just in case."
+For managed installation to enforce this contract, the installer must validate the selected plugin wheel before changing the environment and install the accepted artifact without dependency resolution.
+Direct `pip` or Conda installations remain outside this guarantee.
 
 ## 2. Separate host and worker code
 
@@ -94,7 +106,7 @@ class SegmenterWidget(QWidget):
         self.viewer.add_labels(labels)
 ```
 
-After migration, the widget remains in the outer package and sends only data and parameters:
+After migration, the widget remains in the main plugin package and sends only data and parameters:
 
 ```python
 from typing import Any
@@ -136,7 +148,7 @@ def segment(
     return np.asarray(labels)
 ```
 
-Moving a heavy import inside the host function is not sufficient.
+Moving an additional-package import inside the host function is not sufficient.
 The function itself must run as a worker command in the managed environment.
 
 Do not pass a viewer, layer, widget, Qt object, generator, open file, or arbitrary callable to a worker.
@@ -144,7 +156,7 @@ Pass the layer's array data and ordinary parameters, then apply the returned res
 
 ## 3. Add an embedded worker project
 
-The preferred layout adds a minimal worker project inside the outer plugin package:
+The preferred layout adds a minimal worker project inside the main plugin package:
 
 ```text
 napari-segmenter/
@@ -161,7 +173,7 @@ napari-segmenter/
 
 The inner project needs only two files for a single-module worker.
 It does not need an `__init__.py`, README, or separate source tree.
-It is shipped inside the outer plugin wheel and is not published as a second distribution.
+It is shipped inside the main plugin wheel and is not published as a second distribution.
 
 Create `src/napari_segmenter/worker/pyproject.toml`:
 
@@ -185,11 +197,11 @@ The `napari.yaml` environment recipe is the single authoritative declaration of 
 Duplicating them in the inner project can produce a second, inconsistent resolution path.
 
 The inner project metadata tells the managed-environment backend how to make `napari_segmenter_worker` importable in the worker environment.
-Napari still discovers the plugin from the outer project's `napari.manifest` entry point and never treats the inner project as another plugin.
+Napari still discovers the plugin from the main package's `napari.manifest` entry point and never treats the inner project as another plugin.
 
-## 4. Include worker source in the outer wheel
+## 4. Include worker source in the main wheel
 
-Add the manifest and embedded worker files to the outer project's package data:
+Add the manifest and embedded worker files to the main package's package data:
 
 ```toml
 [tool.setuptools]
@@ -203,7 +215,7 @@ napari_segmenter = [
 ]
 ```
 
-This step is required even though the outer package does not import the worker module.
+This step is required even though the main package does not import the worker module.
 The qualified worker target identifies which callable to import, but it does not transfer the callable's source code.
 
 When napari prepares the environment, it resolves `worker` relative to the installed `napari.yaml` and asks the backend to install that embedded project into the isolated environment.
@@ -211,7 +223,7 @@ The backend installs the worker project without using it as the dependency autho
 
 This design has two useful properties:
 
-- the plugin author publishes one outer plugin wheel;
+- the plugin author publishes one main plugin wheel;
 - the worker code prepared later is the code shipped with that installed plugin version.
 
 ## 5. Declare the environment and worker command
@@ -277,7 +289,7 @@ when the environment is optional, unusually large, or used by only some plugin f
 The plugin UI must make first-use preparation visible through its progress and cancellation controls.
 
 The Plugins window shows declared environments and lets users prepare, rebuild, cancel, stop, or remove them.
-An installation performed outside napari's managed plugin flow can install the lightweight host package, but napari cannot promise installation-time provisioning for that external flow.
+An installation performed outside napari's managed plugin flow can install the main plugin package, but napari cannot promise installation-time provisioning for that external flow.
 The environment remains available for explicit or on-demand preparation.
 
 ## 6. Add progress and cooperative cancellation
@@ -449,7 +461,7 @@ Testing only an editable checkout can hide missing package-data declarations.
 
 Add tests that prove:
 
-- importing the outer plugin and constructing its widget does not import worker-only dependencies;
+- importing the main plugin package and constructing its widget does not import packages declared only in worker environments;
 - widget callbacks run in the napari process;
 - the qualified target runs in the declared worker environment;
 - arrays, scalars, strings, bytes, and nested supported containers round-trip correctly;
@@ -458,8 +470,8 @@ Add tests that prove:
 - cancellation works during provisioning and execution;
 - remote exceptions appear as `PluginWorkerError` with useful diagnostics;
 - the environment is reused when its recipe is unchanged;
-- changing a dependency, Python constraint, channel, lockfile, or outer plugin version produces a new recipe and a clean rebuild;
-- changing embedded worker source is accompanied by a new outer plugin version for releases, or an explicit environment rebuild during editable development;
+- changing a dependency, Python constraint, channel, lockfile, or main plugin version produces a new recipe and a clean rebuild;
+- changing embedded worker source is accompanied by a new main plugin version for releases, or an explicit environment rebuild during editable development;
 - two test plugins can use incompatible versions of the same dependency without changing the napari environment or each other;
 - stopping workers does not remove the persistent environment;
 - napari shutdown closes workers and transport resources;
@@ -475,16 +487,16 @@ Publish the migrated plugin only after the schema and napari runtime versions it
 
 Choose one of these compatibility strategies:
 
-1. Release a new plugin version that requires the first compatible napari version and remove heavy outer dependencies.
+1. Release a new plugin version that requires the first compatible napari version and remove every main-package dependency not supplied by napari.
 2. Keep the previous plugin release available for older napari versions while documenting the version boundary.
 3. Use a maintenance branch for the older in-process implementation if the supported user base requires it.
 
-Do not silently expose the same command as both an in-process heavy command and a managed worker based on runtime version.
+Do not silently expose the same command as both an in-process command with additional requirements and a managed worker based on runtime version.
 That makes dependency installation and execution location difficult for users to predict.
 
 When updating an existing environment recipe, describe the rebuild and expected download size in the release notes.
-Napari reuses a persistent environment while its declared recipe and outer plugin version are unchanged.
-Release a new outer version when embedded worker source changes; during editable development, rebuild the environment explicitly.
+Napari reuses a persistent environment while its declared recipe and main plugin version are unchanged.
+Release a new main plugin version when embedded worker source changes; during editable development, rebuild the environment explicitly.
 Interrupted, failed, or canceled provisioning is cleaned up so the next attempt performs a clean rebuild rather than resuming a partial installation.
 
 If a release must be rolled back:
@@ -500,11 +512,11 @@ Use napari's environment lifecycle controls so ownership and cleanup remain cons
 ## Migration checklist
 
 - [ ] Host, worker, and development dependencies are inventoried.
-- [ ] Napari and Qt code remains in the outer host package.
-- [ ] Heavy imports occur only in worker functions.
+- [ ] Napari and Qt code remains in the main plugin package.
+- [ ] Every import not supplied by napari occurs only in worker functions.
 - [ ] Host and worker exchange only supported ordinary values and NumPy arrays.
 - [ ] The embedded worker project has a minimal `pyproject.toml` with no dependencies.
-- [ ] Worker files are included as outer-package data.
+- [ ] Worker files are included as main-package data.
 - [ ] Worker dependencies are declared once in `napari.yaml`.
 - [ ] Every worker command has a qualified target and an environment.
 - [ ] Provisioning policy is chosen deliberately.

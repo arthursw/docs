@@ -25,12 +25,15 @@ recommended**). If you are new to virtual environments, we recommend
 [installing miniconda][miniconda] and [creating a new environment with
 python][python_env].
 
-Even though plugins don't necessarily need to list `napari` as a direct dependency, and
-[should not depend on a specific Qt backend](best-practices-no-qt-backend),
-you will need a working installation of napari in your active Python
-environment to use and test your plugin.
+Plugins that import napari at runtime should list `napari` as a dependency, but they
+[should not depend on a specific Qt backend](best-practices-no-qt-backend).
+You will need a working installation of napari in your active Python environment to use and test your plugin.
 See the [installation guide](napari-installation) if this is your first time
 installing napari.
+
+This tutorial builds a plugin whose code runs in the napari process and uses no package beyond napari's own requirements.
+If a plugin needs another runtime package, napari isolates that dependency in a plugin-specific environment and runs the corresponding function in a worker process.
+The [isolated worker environment guide](managed-worker-environments) explains that structure after this introductory example.
 
 ## What is a plugin?
 
@@ -215,10 +218,13 @@ of the corresponding `command` in the manifest points to the correct
 
 Lastly, we need to make a few changes to `pyproject.toml`.
 
-1. `show_hello_message` can import `napari.utils.notifications` without adding `napari` to the plugin's runtime dependencies.
-   Napari discovers and calls this host code from an already running napari installation.
-   Add napari to a development or testing dependency group instead so contributors can run the plugin's tests without making a plugin installation resolve napari again.
-   Declare other dependencies required by host code in the outer project, but put isolated worker-only dependencies in a [managed environment declaration](managed-worker-environments).
+This example has one Python package, and all its code runs inside the napari process.
+Code that runs there shares napari's environment, so it may use napari and packages in napari's direct base requirements for the current platform, but it must not introduce another runtime dependency.
+A more advanced plugin can declare a separate managed environment for functions that need additional packages; napari then runs those functions in a worker process without installing their dependencies alongside napari.
+
+1. Because `show_hello_message` imports `napari.utils.notifications` at runtime, add `napari` to the main plugin package's `dependencies`.
+   This keeps the package metadata accurate, lets `pip install napari-hello` work in a clean Python environment, and provides a place to express the minimum compatible napari version when needed.
+   Napari's managed installation flow must verify this requirement against the already running napari rather than resolving or replacing napari.
 
 1. We need to instruct setuptools to *include* that `napari.yaml` file
    when it bundles our package for distribution, by adding
@@ -246,6 +252,7 @@ version = "0.0.1"
 classifiers = [
     "Framework :: napari",
 ]
+dependencies = ["napari"]
 
 [build-system]
 requires = ["setuptools", "wheel"]
@@ -289,7 +296,8 @@ Once napari starts, select `napari-hello: Hello World` from the
 
 ```{tip}
 This first plugin runs entirely in the napari process, which is the simplest appropriate design for its small function.
-If your plugin needs a segmentation framework, a different NumPy version, or another dependency that should not change napari's environment, continue with the [isolated worker environment guide](managed-worker-environments).
+If you add functionality that needs any package outside napari's direct base requirements, do not add that package to this `dependencies` list.
+Continue with the [isolated worker environment guide](managed-worker-environments) to declare the package in an environment and run the corresponding function in a worker process.
 ```
 
 ## 5. (Optional) Build your plugin for distribution
