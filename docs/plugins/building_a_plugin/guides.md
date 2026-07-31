@@ -8,6 +8,13 @@ an example implementation. For details on the type and meaning of each
 field in a specific contribution, See the
 [contributions reference](contributions-ref)
 
+(plugin-environments-guide)=
+
+```{include} ../_npe2_environments_guide.md
+```
+
+______________________________________________________________________
+
 (plugin-readers-guide)=
 
 ```{include} ../_npe2_readers_guide.md

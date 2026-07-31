@@ -74,6 +74,61 @@ NAPARI_CATCH_ERRORS=0
 NAPARI_EXIT_ON_ERROR=1
 ```
 
+## Debugging managed worker commands
+
+A plugin with a managed environment has two separate debugging contexts:
+
+- Host code runs in napari and includes widgets, napari or Qt API use, task callbacks, and conversion between layers and supported values.
+- Worker code runs in a separate process and includes the qualified command target and dependency-heavy imports.
+
+An IDE breakpoint in the napari process does not automatically attach to a managed worker.
+Unit-test the worker function directly in a development environment containing its declared dependencies, then use a real managed-environment test to cover provisioning and transport.
+
+Validate the manifest before provisioning:
+
+```sh
+npe2 validate src/napari_example/napari.yaml
+```
+
+Open the plugin manager's environment dialog to inspect each environment's persistent state and worker state.
+The dialog can prepare or rebuild an environment, cancel provisioning, stop active workers, and remove installed environments.
+Provisioning failures include the failed stage, command, exit status, and captured output where available.
+
+Worker failures are reported to host code as `PluginWorkerError`.
+Its `failure` attribute can contain a remote exception type, message, traceback, worker process details, and serialization context.
+Present a concise message in the plugin widget and retain the structured details in a copyable diagnostic log.
+
+```py
+from napari.plugins import PluginTaskState, PluginWorkerError
+
+
+def handle_done(task):
+    if task.state is PluginTaskState.COMPLETED:
+        show_result(task.result())
+        return
+
+    error = task.error
+    if isinstance(error, PluginWorkerError) and error.failure is not None:
+        append_diagnostics(error.failure.traceback or str(error))
+    else:
+        append_diagnostics(str(error))
+```
+
+Changing the declared environment recipe creates a new persistent generation the next time it is prepared.
+Use **Rebuild** while diagnosing a broken current recipe, and **Remove** followed by **Prepare** when you need to verify a first-install path.
+Napari does not resume an interrupted, failed, or canceled provision; the next attempt starts from a clean build.
+
+For editable host development, remember that the worker is still installed into its managed environment.
+Rebuild that environment after changing worker source so the managed copy matches your checkout.
+Changing only host widget code follows the normal editable-install workflow and does not require a worker rebuild.
+
+Test cancellation at two points:
+
+1. Cancel while the environment is provisioning and verify that no partial environment is retained.
+1. Cancel while the command is running and verify that worker code observes `napari_context.cancel_requested` at useful intervals.
+
+See [Isolated worker environments](managed-worker-environments) for the complete task and context APIs.
+
 ## Overview of methods to debug plugins during development
 
 ### Reload code as you change it with IPython

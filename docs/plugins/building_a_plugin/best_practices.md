@@ -2,9 +2,12 @@
 
 # Best practices for plugin developers
 
-There are a number of good and bad practices that may not be immediately obvious
-when developing a plugin. This page covers some known practices that could
-affect the ability to install or use your plugin effectively.
+Plugin code can run in the napari process or in a declared managed worker environment.
+The placement of code and dependencies affects startup time, compatibility, installation, and cleanup.
+
+Keep manifest loading, GUI integration, and all napari or Qt API use in a lightweight host package.
+Put dependency-heavy computation in a worker command when its requirements are not provided by a default napari installation.
+See [Isolated worker environments](managed-worker-environments) for the complete packaging and execution model.
 
 (best-practices-no-qt-backend)=
 
@@ -127,9 +130,13 @@ the source of the napari installation.
 
 (best_practice_napari_type)=
 
-## Don't require `napari` if not necessary
+## Don't make `napari` a runtime dependency of a plugin
 
-It's good practice to not depend on `napari` if not strictly necessary.
+Napari discovers and calls plugin host code from an already running napari installation.
+Put napari in a development or testing dependency group instead of the outer project's runtime dependencies.
+This avoids asking a package installer to resolve or replace napari when it installs the plugin.
+
+Host code can still import public napari APIs when napari invokes it.
 If you only use `napari` for type annotations, we recommend that you use strings
 instead of importing the types. This is called a
 [Forward reference](https://peps.python.org/pep-0484/#forward-references).
@@ -362,8 +369,9 @@ You can find more information in the
 
 ## License issues when including code from 3rd parties
 
-Plugins will often depend on 3rd party packages beyond `napari` itself.
-These dependencies are usually included in the project metadata in `pyproject.toml`.
+Plugins will often depend on third-party packages beyond `napari` itself.
+Host dependencies are included in the outer project's `pyproject.toml`.
+Worker-only dependencies are declared in the plugin manifest's environment recipe.
 However, sometimes developers might include code from 3rd parties directly in their project.
 Sometimes it will be just a little snippet, maybe slightly modified to suit the project needs.
 Some other times, a whole project will be included entirely (vendoring).
@@ -379,7 +387,7 @@ If you are vendoring other projects, please add an acknowledgement in your READM
 The license details in your project metadata should also include this information!
 ```
 
-## Don't import heavy dependencies at the top of your module
+## Keep dependency-heavy code out of the host process
 
 Consider the following example plugin:
 
@@ -389,8 +397,7 @@ napari.manifest =
   plugin-name = mypackage:napari.yaml
 ```
 
-In this example, `my_heavy_dependency_like_tensorflow` will be imported
-as soon as the user tries to run any of your plugin actions.
+In this example, `my_heavy_dependency_like_tensorflow` is a host dependency and is imported as soon as the module loads.
 
 ```py
 # mypackage/napari_plugin.py
@@ -407,14 +414,8 @@ class FastWidget(QWidget):
         return np.zeros((10, 10))
 ```
 
-In this case, only `MyWidget` requires the heavy dependency, but with the import
-at the top-level, `FastWidget` will also be affected by the slow import time of
-`my_heavy_dependency_like_tensorflow`.
-
-This can deteriorate the end-user experience, and make napari feel sluggish. Best
-practice is to delay heavy imports until right before they are used. The
-following slight modification will help other bits of your plugin,
-like `FastWidget`, load much faster:
+This makes the host plugin slow to import and lets the heavy package constrain napari's environment.
+Moving the import inside the method delays the cost, but does not isolate the dependency:
 
 ```py
 # mypackage/napari_plugin.py
@@ -429,3 +430,48 @@ class MyWidget(QWidget):
 
         return something_amazing()
 ```
+
+Lazy imports remain useful for dependencies that intentionally belong in the host.
+When a package is not part of napari's default installation, prefer a managed worker:
+
+```py
+from napari.plugins import execute_worker_command
+
+
+class MyWidget(QWidget):
+    def do_something_amazing(self):
+        task = execute_worker_command(
+            "plugin-name.something_amazing",
+            self._input_array,
+        )
+        task.add_progress_callback(self._show_progress)
+        task.add_done_callback(self._handle_result)
+        return task
+```
+
+The associated command target imports the heavy dependency inside the plugin's declared worker environment.
+The worker module must not import napari or Qt.
+
+```{note}
+Readers, writers, widgets, sample-data providers, and other contribution callables keep their existing in-process contracts.
+A host contribution can submit a separate worker command and use its returned data after completion.
+```
+
+## Keep worker dependencies in one authoritative recipe
+
+Declare packages needed only by worker code in the environment's `conda` and `pypi` lists in `napari.yaml`.
+The embedded worker project's `pyproject.toml` must have an empty `dependencies` list.
+This makes the manifest the single recipe napari can display, fingerprint, provision, reuse, and rebuild.
+
+Do not duplicate heavy requirements in the outer host dependencies or the embedded worker project.
+Duplicating them can install packages into the wrong process or make the declared recipe differ from what the worker actually needs.
+
+Prefer one embedded worker distribution when several named environments execute different targets from the same worker code.
+Each environment can install that distribution with a different dependency recipe.
+Separate embedded distributions are also supported when environments contain genuinely independent worker implementations, at the cost of additional packaging and validation.
+
+## Treat isolation as compatibility, not security
+
+Managed environments prevent worker dependencies from changing napari's packages or another plugin's environment.
+They do not restrict files, network access, credentials, subprocesses, or hardware access.
+Plugin code remains trusted code running with the user's permissions.

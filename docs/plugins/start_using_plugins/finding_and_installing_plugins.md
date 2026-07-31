@@ -78,6 +78,37 @@ From the dialog, you can install plugins in the following ways:
 The [napari-plugin-manager's documentation](https://napari.org/napari-plugin-manager/) provides more
 detail on installing plugins.
 
+## Managing isolated plugin environments
+
+An installed plugin can declare one or more environments for dependency-heavy worker commands.
+Select **Environments** on that plugin's entry to see each environment's installation policy, persistent state, and worker state.
+
+Available actions include:
+
+- **Prepare** installs a missing or changed environment.
+- **Rebuild** recreates the current environment from a clean state.
+- **Cancel** interrupts provisioning and removes the incomplete build.
+- **Stop workers** cancels active work and closes worker processes without deleting the provisioned environment.
+- **Remove** stops workers and deletes the persistent environment.
+
+An `on_install` environment is prepared after the plugin package is installed or updated through napari's plugin manager.
+An `on_demand` environment remains uninstalled until the user prepares it or the plugin first invokes its worker command.
+Provisioning does not start a worker; napari starts workers lazily when a command needs them and reuses the environment while its recipe is unchanged.
+
+Progress and failure details appear in the environment dialog.
+A plugin that invokes an `on_demand` worker should also display progress, cancellation, and useful failure information in the plugin's own widget.
+
+```{important}
+Napari can coordinate environment provisioning only for plugin installation flows it manages.
+Installing or updating a plugin directly with `pip` or `conda` still discovers its declarations, but does not run an `on_install` provisioning transaction.
+Open the plugin manager and prepare the environment, or let a worker invocation prepare it on demand.
+```
+
+Managed environments prevent a plugin's worker dependencies from changing napari or another plugin's environment.
+They are not security sandboxes, and worker code has the user's operating-system permissions.
+
 ## Uninstalling and updating plugins
 
 Like installation, the plugin dialog can also be used to uninstall or update plugins in a similar way.
+For plugins with managed environments, uninstall first stops owned workers and removes the environments.
+If cleanup fails, the plugin package remains installed so the operation can be retried without leaving hidden owned resources.

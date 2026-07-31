@@ -25,6 +25,29 @@ When you are ready to share your plugin, [upload the Python package to
 PyPI][pypi-upload] after which it will be installable using `python -m pip install <yourpackage>`, or (assuming you added the `Framework :: napari` classifier)
 in the builtin plugin installer dialog.
 
+### Publishing a plugin with embedded worker code
+
+Publish one outer plugin distribution.
+The embedded worker project is package data inside that wheel and source distribution; it is not a second package that users install or a second project that you must publish.
+
+Before upload, build both artifacts and inspect their contents:
+
+```sh
+python -m build
+python -m zipfile --list dist/napari_example-1.0.0-py3-none-any.whl
+tar --list --file dist/napari_example-1.0.0.tar.gz
+```
+
+Verify that `napari.yaml`, the worker's `pyproject.toml`, worker modules, lockfiles, and any declared local resources are present.
+Install the built wheel into a clean napari environment and prepare each `on_install` environment through the plugin manager.
+Invoke every `on_demand` worker at least once or prepare it manually.
+
+Only host requirements belong in the outer `[project].dependencies`.
+Worker requirements belong in `contributions.environments`, and the embedded worker project's dependency list remains empty.
+This allows napari's managed installer to provision the manifest recipe without changing the environment running napari.
+
+See [Isolated worker environments](managed-worker-environments) for the required layout and [Migrating an existing plugin](managed-environment-migration) for a release checklist.
+
 If you used the {ref}`napari-plugin-template`, you can also
 [setup automated deployments][autodeploy] on GitHub for every tagged commit.
 

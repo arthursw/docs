@@ -12,6 +12,10 @@ This guide explains the value of using virtual environments and how to create an
 
 A virtual environment is an isolated collection of packages, settings, and an associated Python interpreter, that allows multiple different collections to exist on the same system. They are created on top of an existing Python installation, known as the virtual environment's “base” python, and may optionally be isolated from the packages in the base environment, so only those explicitly installed in the virtual environment are available.
 
+This guide describes environments that developers and users create for napari itself.
+They are different from [napari-managed plugin worker environments](managed-worker-environments), which a plugin declares in its manifest and napari provisions for dependency-heavy worker commands.
+You still need a development environment to build and test a plugin even when it uses managed workers.
+
 More information on why virtual environments are created and how they can help you can be found on the [python website](https://docs.python.org/3/library/venv.html#creating-virtual-environments) and in [this introductory workshop](https://hackmd.io/@talley/SJB_lObBi#What-is-a-virtual-environment).
 
 Virtual environments are super important! They allow you to isolate your project from other Python projects. They allow you to experiment with various packages and versions without fear of breaking your entire system (and needing to reinstall everything). As you install packages over time, you will inevitably install something that doesn’t “play well” with something else that is already installed. In some cases this can be hard to recover from. With virtual environments, you can just create a fresh environment and start again – without needing to do major surgery on your system.

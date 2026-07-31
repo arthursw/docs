@@ -121,17 +121,20 @@ requires-python = ">=3.11"
 
 #### Dependencies
 
-List your plugin's dependencies. The hub displays these on the detail page.
+List only dependencies needed by code that runs in the napari process.
+The hub displays this outer package metadata on the detail page.
 
 ```toml
 [project]
 dependencies = [
     "numpy>=1.21",
-    "scikit-image>=0.19",
-    "torch>=2.0",
     "qtpy",
 ]
 ```
+
+If dependency-heavy functionality runs as a managed worker, declare packages such as segmentation or machine-learning frameworks in an environment contribution instead.
+The environment recipe is authoritative for worker provisioning, but the hub does not currently present it as outer package dependency metadata.
+See [Isolated worker environments](managed-worker-environments).
 
 ```{warning}
 **Never include Qt backends** (`PyQt5`, `PyQt6`, `PySide2`, `PySide6`) or `napari[all]` in your base dependencies! See [](best-practices-no-qt-backend) for details.

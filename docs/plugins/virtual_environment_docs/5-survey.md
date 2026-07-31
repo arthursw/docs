@@ -77,7 +77,12 @@ Answer:
 
 ## Are there testing environments in napari?
 
-Answer: Napari does not create or otherwise manage environments.
+Answer:
+
+- Use a normal virtual or Conda environment to develop and test napari or a plugin.
+- Napari can also provision persistent, plugin-specific environments for declared worker commands.
+- These managed environments isolate worker dependencies from napari; they do not replace a developer environment and are not security sandboxes.
+- See [Isolated worker environments](managed-worker-environments).
 
 ## Introduction to npe2? Migrating to new plugin architecture?
 

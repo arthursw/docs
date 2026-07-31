@@ -14,6 +14,37 @@ We recommend using
 [pytest](https://docs.pytest.org/en/6.2.x/getting-started.html) for testing your
 plugin. Aim for [100% test coverage](best-practices-test-coverage)!
 
+## Test plugins with managed environments
+
+Test the host and worker sides independently before adding a smaller number of end-to-end tests.
+
+Your host test suite should verify that:
+
+- Importing and discovering the plugin succeeds without installing worker-only dependencies.
+- Widget and napari or Qt integration code runs in the napari process.
+- The widget submits the expected qualified worker command and handles progress, completion, cancellation, and structured failure.
+- NumPy arrays are converted to and from layer data at the host boundary.
+
+Your worker test suite should import the embedded worker module without napari or Qt and call each target as an ordinary function.
+Provide a small fake `napari_context` when testing progress and cooperative cancellation.
+
+Add packaging tests that build the outer wheel and source distribution, then inspect them for:
+
+- `napari.yaml`.
+- `worker/pyproject.toml`.
+- Every worker module and required worker resource.
+- No worker-only package in the outer distribution's `Requires-Dist` metadata.
+- An empty static `dependencies` list in the embedded worker project.
+
+Run `npe2 validate` against the built or installed plugin so path containment, environment references, and worker command declarations are checked.
+
+At least one integration test should use napari's real environment backend when practical.
+Exercise provisioning, recipe reuse, a recipe change, array and nested-value transport, cancellation, a remote failure, and worker shutdown.
+Use two small fixture plugins with incompatible versions of the same dependency to prove that neither changes napari's environment and that the plugins do not affect each other.
+
+Do not provision large scientific frameworks in every unit-test job.
+Keep unit tests fast and select a supported CI job for the real environment lifecycle.
+
 ### The `make_napari_viewer_proxy` fixture
 
 Testing a napari `Viewer` requires some setup and teardown each time. We have

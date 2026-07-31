@@ -215,10 +215,10 @@ of the corresponding `command` in the manifest points to the correct
 
 Lastly, we need to make a few changes to `pyproject.toml`.
 
-1. Because we are directly using the `napari.utils.notifications` API in our,
-   `show_hello_message` function, we need to add `napari` to our package
-   **`install_requires`**. (You should add *all* of your required package dependencies
-   here. Assume nothing about your user's environment! Not even napari.)
+1. `show_hello_message` can import `napari.utils.notifications` without adding `napari` to the plugin's runtime dependencies.
+   Napari discovers and calls this host code from an already running napari installation.
+   Add napari to a development or testing dependency group instead so contributors can run the plugin's tests without making a plugin installation resolve napari again.
+   Declare other dependencies required by host code in the outer project, but put isolated worker-only dependencies in a [managed environment declaration](managed-worker-environments).
 
 1. We need to instruct setuptools to *include* that `napari.yaml` file
    when it bundles our package for distribution, by adding
@@ -246,7 +246,6 @@ version = "0.0.1"
 classifiers = [
     "Framework :: napari",
 ]
-dependencies = ["napari"]
 
 [build-system]
 requires = ["setuptools", "wheel"]
@@ -287,6 +286,11 @@ Once napari starts, select `napari-hello: Hello World` from the
 `Plugins` menu, then click the `Run` button to see the message.
 
 % ![hello-example](../images/hello.png)
+
+```{tip}
+This first plugin runs entirely in the napari process, which is the simplest appropriate design for its small function.
+If your plugin needs a segmentation framework, a different NumPy version, or another dependency that should not change napari's environment, continue with the [isolated worker environment guide](managed-worker-environments).
+```
 
 ## 5. (Optional) Build your plugin for distribution
 
