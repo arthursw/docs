@@ -235,7 +235,7 @@ This design has two useful properties:
 Move worker dependencies into `contributions.environments` and associate the command with that environment:
 
 ```yaml
-schema_version: 0.4.0
+schema_version: 0.3.0
 name: napari-segmenter
 display_name: Segmenter
 contributions:

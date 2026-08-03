@@ -238,7 +238,7 @@ Module-level functions make the code importable and its execution contract revie
 Add an environment and a worker command to `napari.yaml`:
 
 ```yaml
-schema_version: 0.4.0
+schema_version: 0.3.0
 name: napari-example
 display_name: Example
 contributions:
