@@ -102,12 +102,15 @@ npe2 validate --host-dependencies dist/napari_example-0.1.0-py3-none-any.whl
 An invalid host dependency report identifies the requirement that must be removed from the main package or moved with its importing code to a managed worker environment.
 
 Open the plugin manager's environment dialog to inspect each environment's persistent state and worker state.
-The dialog can prepare or rebuild an environment, cancel provisioning, stop active workers, and remove installed environments.
-Provisioning failures include the failed stage, command, exit status, and captured output where available.
+The dialog can install an environment ahead of first use, rebuild it, cancel provisioning, stop active workers, and remove installed environments.
+Its resizable, scrollable operation log is shared by the selected plugin's environments and includes the failed stage, command, exit status, captured output, and other structured failure details where available.
+Use an environment row's **Show log** action or the log filter to select relevant records, then use **Copy** when attaching diagnostics to a bug report.
+Napari retains a bounded history for the current session, so the dialog can replay a recent on-demand operation that ran while the Plugin Manager was closed; that history is not retained after napari exits.
 
 Worker failures are reported to host code as `PluginWorkerError`.
 Its `failure` attribute can contain a remote exception type, message, traceback, worker process details, and serialization context.
-Present a concise message in the plugin widget and retain the structured details in a copyable diagnostic log.
+Present a concise message and execution progress in the plugin widget.
+Use the Managed Environments operation log for shared, copyable lifecycle diagnostics instead of adding a separate provisioning log to every widget.
 
 ```py
 from napari.plugins import PluginTaskState, PluginWorkerError
@@ -126,7 +129,7 @@ def handle_done(task):
 ```
 
 Changing the declared environment recipe creates a new persistent generation the next time it is prepared.
-Use **Rebuild** while diagnosing a broken current recipe, and **Remove** followed by **Prepare** when you need to verify a first-install path.
+Use **Rebuild** while diagnosing a broken current recipe, and **Remove** followed by **Install** when you need to verify a first-install path.
 Napari does not resume an interrupted, failed, or canceled provision; the next attempt starts from a clean build.
 
 For editable host development, remember that the worker is still installed into its managed environment.

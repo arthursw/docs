@@ -105,7 +105,7 @@ Select **Environments** on that plugin's entry to see each environment's install
 
 Available actions include:
 
-- **Prepare** installs a missing or changed environment.
+- **Install** prepares a missing or changed environment ahead of first use.
 - **Rebuild** recreates the current environment from a clean state.
 - **Cancel** interrupts provisioning and removes the incomplete build.
 - **Stop workers** cancels active work and closes worker processes without deleting the provisioned environment.
@@ -115,13 +115,20 @@ An `on_install` environment is prepared after the plugin package is installed or
 An `on_demand` environment remains uninstalled until the user prepares it or the plugin first invokes its worker command.
 Provisioning does not start a worker; napari starts workers lazily when a command needs them and reuses the environment while its recipe is unchanged.
 
-Progress and failure details appear in the environment dialog.
-A plugin that invokes an `on_demand` worker should also display progress, cancellation, and useful failure information in the plugin's own widget.
+Environment preparation does not depend on the Plugins window remaining open.
+During preparation, napari's Activity panel shows lifecycle progress for preparing, provisioning, starting, and cleanup, with a cancel control.
+When a worker command begins executing, its progress and cancel control remain in the plugin widget that started it instead of occupying the Activity panel.
+
+The Managed Environments dialog contains one resizable, scrollable operation log shared by the selected plugin's environments.
+Use its environment filter or an environment row's **Show log** action to find relevant records, including structured failure details.
+**Copy** copies the displayed diagnostics and **Clear** clears the displayed text.
+Napari keeps a bounded operation history for the current application session, so opening the dialog after an on-demand first use replays recent preparation records even when the manager was closed during the operation.
+This history is for the current session only and is not a persistent log across napari restarts.
 
 ```{important}
 Napari can coordinate environment provisioning only for plugin installation flows it manages.
 Installing or updating a plugin through Conda, a direct-entry field, `pip`, or another external tool still discovers its declarations, but does not run an `on_install` provisioning transaction.
-Open the plugin manager and prepare the environment, or let a worker invocation prepare it on demand.
+Open the plugin manager and install the environment, or let a worker invocation prepare it on demand.
 ```
 
 Managed environments prevent a plugin's worker dependencies from changing napari or another plugin's environment.
