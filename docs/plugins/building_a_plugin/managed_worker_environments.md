@@ -49,7 +49,6 @@ A managed installation must install only the main package and must not request o
 With that validation, accepting a plugin does not add, upgrade, or downgrade packages in napari's environment.
 The error should identify the rejected requirement and direct the author to move it, and the code that imports it, to a managed environment.
 Installations performed directly with `pip`, Conda, or another external tool remain outside that guarantee because napari does not control their dependency resolution.
-After napari or its base environment is upgraded, the managed installer must revalidate installed plugins against the new exact versions and disable or report any plugin that no longer satisfies the contract.
 
 ## Create an embedded worker distribution
 
@@ -91,9 +90,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "napari-example"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "napari>=0.8.1",
+    "napari",
     "numpy",
     "qtpy",
 ]
@@ -122,6 +121,10 @@ Declare every such package in an environment in `napari.yaml`.
 
 An external `pip install` resolves the main package's metadata normally, which keeps the distribution usable outside napari's installer.
 The napari-managed installation design requires validation of the selected wheel before installation, as described in the dependency rule above.
+
+This example deliberately leaves the napari requirement unbounded while the managed-environment API is under coordinated pre-release development.
+Before publishing a plugin that uses this API, replace `napari` with a lower bound on the first released napari version that provides it.
+During pre-release development, install the coordinated napari and `npe2` development checkouts explicitly rather than guessing a future release number in published metadata.
 
 The `package-data` entry is essential.
 It places the inner `pyproject.toml` and worker source in the built plugin wheel so that napari can prepare the environment from the installed plugin.
@@ -166,6 +169,9 @@ Each line has a narrow purpose:
 
 Napari does not install this inner project while installing the host plugin.
 It reads the installed plugin manifest, resolves `worker` relative to that manifest, validates the inner project, and passes that local project to the managed environment backend during provisioning.
+
+The initial backend requires Wetlands 2.2 or later, but Wetlands is an internal napari implementation dependency rather than part of the plugin API.
+Plugin manifests and Python code use napari's environment and task abstractions and must not import Wetlands.
 
 ## Write a worker target
 
@@ -536,7 +542,7 @@ Inspect the inner `pyproject.toml` in the wheel and confirm that `dependencies` 
 Validate the built artifact in an environment containing one supported napari version:
 
 ```sh
-npe2 validate dist/napari_example-0.1.0-py3-none-any.whl
+npe2 validate --host-dependencies dist/napari_example-0.1.0-py3-none-any.whl
 ```
 
 `npe2 validate` reads the wheel's authoritative `Requires-Dist` metadata.

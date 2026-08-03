@@ -25,8 +25,9 @@ recommended**). If you are new to virtual environments, we recommend
 [installing miniconda][miniconda] and [creating a new environment with
 python][python_env].
 
-Plugins that import napari at runtime should list `napari` as a dependency, but they
-[should not depend on a specific Qt backend](best-practices-no-qt-backend).
+Plugins that import napari at runtime should list `napari` as a dependency, but they [should not depend on a specific Qt backend](best-practices-no-qt-backend).
+That declaration keeps the plugin's standard Python package metadata complete: installing the plugin in a clean development environment also installs napari, and the plugin can state which napari releases it supports.
+When napari itself manages a plugin installation, it validates that the declared napari requirement accepts the version already running and installs the plugin wheel without resolving napari again.
 You will need a working installation of napari in your active Python environment to use and test your plugin.
 See the [installation guide](napari-installation) if this is your first time
 installing napari.
@@ -138,6 +139,7 @@ Paste the following text into `pyproject.toml`:
 [project]
 name = "napari-hello"
 version = "0.0.1"
+requires-python = ">=3.11"
 classifiers = [
     "Framework :: napari",
 ]
@@ -315,7 +317,7 @@ which you can upload to [PyPI](https://pypi.org/) or share with others.
 Validate the wheel in the napari development environment before publishing it:
 
 ```sh
-npe2 validate dist/napari_hello-0.0.1-py3-none-any.whl
+npe2 validate --host-dependencies dist/napari_hello-0.0.1-py3-none-any.whl
 ```
 
 In addition to the manifest, this checks that each active wheel requirement names napari or one of napari's direct base requirements and accepts the installed version.

@@ -78,6 +78,24 @@ From the dialog, you can install plugins in the following ways:
 The [napari-plugin-manager's documentation](https://napari.org/napari-plugin-manager/) provides more
 detail on installing plugins.
 
+### Know which installations protect the napari environment
+
+Napari can guarantee dependency isolation only when it controls the complete main-package installation.
+For a managed PyPI installation, napari selects one exact plugin wheel, checks its runtime requirements against the running napari environment, and rejects it before installation if it requires an additional package or an incompatible version of a package napari already uses.
+Napari then installs that checked wheel without dependency resolution, so accepting the plugin cannot add, upgrade, or downgrade packages alongside napari.
+
+The following routes are not managed main-package installations:
+
+- choosing a Conda package;
+- entering a package name, URL, local path, or VCS reference in a direct-install field;
+- running `pip` or Conda outside napari.
+
+Those routes use their package manager's normal dependency resolution and can change napari's environment.
+Napari still discovers any managed-environment declarations after the plugin is installed, but that does not retroactively make the main-package installation isolated or run an `on_install` provisioning transaction.
+
+If a managed PyPI installation is blocked by the host dependency check, the error identifies the rejected requirement.
+The plugin author must [move that dependency and the code that imports it to a managed worker environment](managed-environment-migration); bypassing the check with a direct install gives up napari's conflict-prevention guarantee.
+
 ## Managing isolated plugin environments
 
 Plugin interface code runs inside napari, but a plugin may need packages that napari does not supply.
@@ -102,7 +120,7 @@ A plugin that invokes an `on_demand` worker should also display progress, cancel
 
 ```{important}
 Napari can coordinate environment provisioning only for plugin installation flows it manages.
-Installing or updating a plugin directly with `pip` or `conda` still discovers its declarations, but does not run an `on_install` provisioning transaction.
+Installing or updating a plugin through Conda, a direct-entry field, `pip`, or another external tool still discovers its declarations, but does not run an `on_install` provisioning transaction.
 Open the plugin manager and prepare the environment, or let a worker invocation prepare it on demand.
 ```
 

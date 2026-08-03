@@ -47,7 +47,7 @@ The following commands will report any issues napari detects with your plugin th
 
 - `napari --plugin-info -v` prints installed napari plugins, what they provide, and any issues related to these plugins.
 - `napari --info` prints key environment information related to napari, and the version of installed plugins.
-- `npe2 validate YOUR_PLUGIN_NAME` checks the installed plugin's manifest and host dependency metadata against the current napari environment.
+- `npe2 validate --host-dependencies YOUR_PLUGIN_NAME` checks the installed plugin's manifest and host dependency metadata against the current napari environment.
 
 ```{note}
 In general, `napari --info` is a good first step to debugging any environment issues and providing the output from this command is useful when raising bugs.
@@ -87,7 +87,7 @@ Unit-test the worker function directly in a development environment containing i
 Validate the manifest before provisioning:
 
 ```sh
-npe2 validate src/napari_example/napari.yaml
+npe2 validate --host-dependencies src/napari_example/napari.yaml
 ```
 
 For a source manifest, `npe2` checks a matching static `[project].dependencies` table when available.
@@ -96,7 +96,7 @@ Build and validate the wheel before release so final metadata is authoritative:
 
 ```sh
 python -m build
-npe2 validate dist/napari_example-0.1.0-py3-none-any.whl
+npe2 validate --host-dependencies dist/napari_example-0.1.0-py3-none-any.whl
 ```
 
 An invalid host dependency report identifies the requirement that must be removed from the main package or moved with its importing code to a managed worker environment.

@@ -132,6 +132,10 @@ If host code imports a public napari API at runtime, declare `napari` in the mai
 This keeps the distribution metadata accurate, supports installation into a clean Python environment, and can express a minimum compatible napari version.
 Do not declare `napari[all]`, `napari[qt]`, or another napari extra as a normal runtime dependency.
 
+Declaring `napari` does not mean that napari's managed installer resolves or reinstalls it.
+The managed installer checks that the requirement accepts the version already running, then installs the validated plugin wheel without dependencies.
+An ordinary `pip install` still follows standard Python packaging behavior and may install napari into a clean environment, which is why the declaration remains useful and correct outside napari.
+
 Apply the same packaging rule to every direct host import.
 For example, declare NumPy or qtpy when host code imports it, but only because both are direct base requirements of napari.
 Do not declare a package that napari does not require; move the code that imports it to a managed worker environment.

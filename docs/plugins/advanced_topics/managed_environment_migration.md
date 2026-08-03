@@ -45,7 +45,7 @@ Classify every import and dependency before changing the package.
 
 | Dependency kind | Examples | Where it belongs after migration |
 | --- | --- | --- |
-| Host | `napari`, Python's standard library, and packages supplied by napari such as NumPy and qtpy | Main plugin package; declare each directly imported package in `[project].dependencies` |
+| Host | `napari`, Python's standard library, and direct base requirements of napari such as NumPy and qtpy | Main plugin package; declare each directly imported package in `[project].dependencies` |
 | Worker | Every runtime package not supplied by napari, including TensorFlow, PyTorch, Cellpose, StarDist, or a small helper library | The environment recipe in `napari.yaml` |
 | Development | `pytest`, `pytest-qt`, linters, documentation tools | Optional development or test dependency groups |
 
@@ -76,8 +76,9 @@ After migration, the main package declares only the dependencies imported by hos
 ```toml
 [project]
 name = "napari-segmenter"
+requires-python = ">=3.11"
 dependencies = [
-    "napari>=0.8.1",
+    "napari",
     "numpy",
     "qtpy",
 ]
@@ -86,6 +87,9 @@ dependencies = [
 Do not retain a package not supplied by napari in the main package "just in case."
 For managed installation to enforce this contract, the installer must validate the selected plugin wheel before changing the environment and install the accepted artifact without dependency resolution.
 Direct `pip` or Conda installations remain outside this guarantee.
+
+While the managed-environment API is under coordinated pre-release development, install compatible napari and `npe2` development checkouts explicitly.
+Before publishing the migrated plugin, give `napari` a lower bound on the first released napari version that provides the API; do not guess that release number in advance.
 
 ## 2. Separate host and worker code
 
@@ -425,7 +429,7 @@ Show a concise message in the widget or a napari notification, and preserve deta
 Install a version of `npe2` that supports managed environments, then validate the plugin:
 
 ```sh
-npe2 validate src/napari_segmenter/napari.yaml
+npe2 validate --host-dependencies src/napari_segmenter/napari.yaml
 ```
 
 Validation should reject:
@@ -449,7 +453,7 @@ Build the distribution and inspect its contents:
 
 ```sh
 python -m build
-npe2 validate dist/napari_segmenter-1.0.0-py3-none-any.whl
+npe2 validate --host-dependencies dist/napari_segmenter-1.0.0-py3-none-any.whl
 python -m zipfile -l dist/napari_segmenter-1.0.0-py3-none-any.whl
 ```
 

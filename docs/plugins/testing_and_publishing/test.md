@@ -44,7 +44,7 @@ Build the wheel and run `npe2 validate` against that artifact in an environment 
 
 ```sh
 python -m build
-npe2 validate dist/napari_example-0.1.0-py3-none-any.whl
+npe2 validate --host-dependencies dist/napari_example-0.1.0-py3-none-any.whl
 ```
 
 This checks path containment, environment references, worker command declarations, and the wheel's final `Requires-Dist` metadata.

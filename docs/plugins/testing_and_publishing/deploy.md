@@ -43,7 +43,7 @@ tar --list --file dist/napari_example-1.0.0.tar.gz
 ```
 
 Verify that `napari.yaml`, the worker's `pyproject.toml`, worker modules, lockfiles, and any declared local resources are present.
-Run `npe2 validate dist/napari_example-1.0.0-py3-none-any.whl` against at least the oldest and newest supported napari versions across the supported Python and platform matrix, plus any known dependency-boundary versions, so final host requirements are checked against napari's active direct base requirements and installed versions.
+Run `npe2 validate --host-dependencies dist/napari_example-1.0.0-py3-none-any.whl` against at least the oldest and newest supported napari versions across the supported Python and platform matrix, plus any known dependency-boundary versions, so final host requirements are checked against napari's active direct base requirements and installed versions.
 The managed installer must repeat the check against the user's exact environment.
 Install the built wheel into a clean napari environment and prepare each `on_install` environment through the plugin manager.
 Invoke every `on_demand` worker at least once or prepare it manually.
