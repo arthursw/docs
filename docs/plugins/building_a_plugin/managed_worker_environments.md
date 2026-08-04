@@ -465,6 +465,7 @@ Executing a worker command still prepares a missing or stale environment before 
 
 On-demand preparation works whether or not the Plugin Manager is open.
 Lifecycle progress remains visible in napari's Activity panel, and opening Managed Environments later in the same session replays the recent bounded operation history.
+If an operation is still running, opening or reopening Managed Environments reconnects its row to the napari-owned task, restores current progress and cancellation controls, and disables conflicting environment actions until the task finishes.
 
 Prepared environments persist across napari sessions.
 Napari fingerprints the main plugin version, normalized environment recipe, lockfile contents, backend version, and recipe ABI.

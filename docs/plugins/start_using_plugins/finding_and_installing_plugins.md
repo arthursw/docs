@@ -120,6 +120,7 @@ During preparation, napari's Activity panel shows lifecycle progress for prepari
 When a worker command begins executing, its progress and cancel control remain in the plugin widget that started it instead of occupying the Activity panel.
 
 The Managed Environments dialog contains one resizable, scrollable operation log shared by the selected plugin's environments.
+Closing this dialog does not stop an operation; reopening it restores the active environment's progress, Cancel control, and disabled conflicting actions until the operation completes or fails.
 Use its environment filter or an environment row's **Show log** action to find relevant records, including structured failure details.
 **Copy** copies the displayed diagnostics and **Clear** clears the displayed text.
 Napari keeps a bounded operation history for the current application session, so opening the dialog after an on-demand first use replays recent preparation records even when the manager was closed during the operation.

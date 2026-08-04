@@ -424,6 +424,7 @@ Use `add_done_callback`, or await the task from an async integration.
 `PluginWorkerError` represents remote worker failures and may contain structured details such as the remote exception type, traceback, process exit information, and serialization context.
 Show a concise message in the widget or a napari notification.
 The Managed Environments dialog retains detailed, copyable diagnostics in one shared scrollable log for the current session, including structured failure details.
+The dialog also reconnects to operations that are still active when it opens, so its environment row shows current progress and cancellation state rather than presenting stale installation controls.
 Its environment filter and **Show log** action locate relevant records, and opening it after a first-use operation replays napari's recent bounded session history.
 The history is not persisted across napari restarts.
 
