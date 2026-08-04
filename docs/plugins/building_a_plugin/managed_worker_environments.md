@@ -413,9 +413,9 @@ Napari also presents managed-task failures through its notification system.
 
 ### Use napari's lifecycle and diagnostics interfaces
 
-Napari presents environment lifecycle work in the Activity panel while the task is preparing, provisioning, starting workers, or cleaning up.
-The Activity entry shows the latest lifecycle message and available progress, and its cancel control requests cancellation through the same `PluginTask`.
-Napari removes that entry when a worker command reaches `EXECUTING`; execution progress belongs in the plugin widget beside the action that started it.
+The `PluginTask` returned by `execute_worker_command()` represents the complete request, including on-demand preparation, worker startup, execution, and final cleanup.
+Use one compact status label, progress bar, and cancel control beside the plugin action that created the task.
+Update those controls from the task's callbacks instead of creating a separate progress item for each lifecycle phase.
 
 Do not add a private scrolling provisioning log to each plugin widget.
 The Plugin Manager's Managed Environments dialog provides one resizable, scrollable operation log shared across the selected plugin's environments.
@@ -423,8 +423,8 @@ It can filter records by environment, focus an environment through **Show log**,
 The dialog consumes napari's bounded in-memory operation history, so it can replay recent on-demand preparation after being opened or reopened later in the same napari session.
 The history is session-only and is cleared when napari exits.
 
-The plugin widget should still show a compact current status, execution progress, a cancel control, and its result or concise failure.
-This keeps progress for the user's computation next to the command without making every plugin implement a second diagnostics viewer.
+The plugin widget should still show compact current status and progress for the entire request, a cancel control, and its result or concise failure.
+This keeps the operation the user initiated next to its command without making every plugin implement a second diagnostics viewer or environment-management interface.
 
 ## Values that can cross the process boundary
 
@@ -464,7 +464,8 @@ A direct `pip install` installs the host package but does not itself trigger nap
 Executing a worker command still prepares a missing or stale environment before starting the worker.
 
 On-demand preparation works whether or not the Plugin Manager is open.
-Lifecycle progress remains visible in napari's Activity panel, and opening Managed Environments later in the same session replays the recent bounded operation history.
+The plugin widget that invokes a worker receives lifecycle and execution updates through the same `PluginTask`, even when the Plugin Manager is closed.
+Opening Managed Environments later in the same session replays the recent bounded operation history.
 If an operation is still running, opening or reopening Managed Environments reconnects its row to the napari-owned task, restores current progress and cancellation controls, and disables conflicting environment actions until the task finishes.
 
 Prepared environments persist across napari sessions.

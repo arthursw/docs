@@ -116,8 +116,8 @@ An `on_demand` environment remains uninstalled until the user prepares it or the
 Provisioning does not start a worker; napari starts workers lazily when a command needs them and reuses the environment while its recipe is unchanged.
 
 Environment preparation does not depend on the Plugins window remaining open.
-During preparation, napari's Activity panel shows lifecycle progress for preparing, provisioning, starting, and cleanup, with a cancel control.
-When a worker command begins executing, its progress and cancel control remain in the plugin widget that started it instead of occupying the Activity panel.
+When a plugin action prepares an on-demand environment, that plugin's widget shows preparation and execution through one progress display with a cancel control.
+When preparation or removal starts in Managed Environments, the corresponding environment row shows its current progress and cancellation control.
 
 The Managed Environments dialog contains one resizable, scrollable operation log shared by the selected plugin's environments.
 Closing this dialog does not stop an operation; reopening it restores the active environment's progress, Cancel control, and disabled conflicting actions until the operation completes or fails.

@@ -290,8 +290,8 @@ provision: on_demand
 ```
 
 when the environment is optional, unusually large, or used by only some plugin features.
-Napari shows first-use preparation in the Activity panel even when the Plugin Manager is closed.
-The plugin UI should show a compact current status, then own the worker's execution progress and cancellation beside the action that started it.
+The plugin UI should show compact current status, progress, and cancellation for the complete request, including first-use preparation and worker execution.
+This keeps an on-demand operation visible even when the Plugin Manager is closed.
 
 The Plugins window shows declared environments and lets users install them ahead of first use, rebuild them, cancel provisioning, stop workers, or remove them.
 An installation performed outside napari's managed plugin flow can install the main plugin package, but napari cannot promise installation-time provisioning for that external flow.
@@ -415,7 +415,7 @@ def _on_done(self, task) -> None:
 
 Keep progress near the action that initiated it.
 For an on-demand environment, the same task reports preparation, provisioning, worker startup, and execution phases.
-Napari mirrors the lifecycle phases in Activity with a cancel control, then removes the Activity entry at `EXECUTING` so execution progress remains in the plugin widget.
+Present those phases through one progress display rather than creating separate indicators for environment preparation and worker execution.
 
 Do not call `task.result()` from the Qt main thread before the task is done.
 Use `add_done_callback`, or await the task from an async integration.
